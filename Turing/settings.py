@@ -12,7 +12,7 @@ https://docs.djangoproject.com/en/4.0/ref/settings/
 import os
 from datetime import timedelta
 from pathlib import Path
-
+from decouple import config
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -21,12 +21,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-9ub!(w#^&govb!smz!$jjfh51*c7k2h3d09pe10k3=gwp8kye5'
+SECRET_KEY = config('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = str(os.environ.get('DEBUG')) == '1'
+DEBUG = config('DEBUG')
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['https://turing-tesla.herokuapp.com/', 'localhost']
 
 if not DEBUG:
     ALLOWED_HOSTS+=[os.environ.get('ALLOWED_HOST')]
@@ -119,6 +119,13 @@ WSGI_APPLICATION = 'Turing.wsgi.application'
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 #____________________________postgres_____________________________
 
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
+}
+
 POSTGRES_DB = os.environ.get("POSTGRES_DB") #database name
 POSTGRES_PASSWORD = os.environ.get("POSTGRES_PASSWORD") # database user password
 POSTGRES_USER = os.environ.get("POSTGRES_USER") # database username
@@ -145,15 +152,15 @@ if POSTGRES_READY:
         }
     }
 
-#___________________________Endpostgrs___________________________
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
-
+# #___________________________Endpostgrs___________________________
+#
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
+# }
+#
 
 # Password validation
 # https://docs.djangoproject.com/en/4.0/ref/settings/#auth-password-validators
