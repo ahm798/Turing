@@ -41,8 +41,11 @@ INSTALLED_APPS = [
     'account.apps.AccountConfig',
     'api.apps.ApiConfig',
     'search.apps.SearchConfig',
+    'space.apps.SpaceConfig',
     'rest_framework',
-    'rest_framework.authtoken'
+    'rest_framework.authtoken',
+    #thirdparty packages
+    'algoliasearch_django',
 ]
 
 MIDDLEWARE = [
@@ -131,4 +134,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
     'PAGE_SIZE': 5
+}
+
+ALGOLIA = {
+    'APPLICATION_ID': '77L0OO6S3A',
+    'API_KEY': 'fcd8b241713a9fa5361429eb4d906552',
+    'INDEX_PREFIX':'tur'
 }

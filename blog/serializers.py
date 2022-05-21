@@ -9,7 +9,7 @@ class TopicSerializer(serializers.ModelSerializer):
 
 
 class ArticleSerializerDetial(serializers.ModelSerializer):
-    topic = TopicSerializer(read_only=True)
+    topic = TopicSerializer()
     owner = UserInlineSerializer(read_only=True)
     class Meta():
         model = Article

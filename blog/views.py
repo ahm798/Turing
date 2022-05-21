@@ -1,7 +1,7 @@
 from rest_framework import generics, permissions, authentication
 from .permissions import IsMember, IsOwner
-from .serializers import ArticleSerializerDetial
-from .models import Article
+from .serializers import ArticleSerializerDetial, TopicSerializer
+from .models import Article, Topic
 
 
 class ArticleDetailView(generics.RetrieveAPIView):
@@ -52,7 +52,14 @@ class ArticleCreateView(generics.CreateAPIView):
 
     def perform_create(self, serializer):
         user = self.request.user
-        serializer.save(owner=user)
+        data = self.request.data
+        print(data)
+        topic_name = data['topic']['name']
+        qs = Topic.objects.filter(name__exact=topic_name).first()
+        if qs is None:
+            qs = Topic.objects.create(name=topic_name)
+        serializer.save(owner=user, topic=qs)
+
 
 Article_Create_View = ArticleCreateView.as_view()
 
@@ -97,4 +104,14 @@ class ArticleDestroyView(generics.DestroyAPIView):
 
 Article_Destroy_view = ArticleDestroyView.as_view()
 
+#____________________________user ListAPIView____________________________________________#
 
+class TopicListView(generics.ListAPIView):
+    queryset = Topic.objects.all()
+    serializer_class = TopicSerializer
+    lookup_field = 'pk'
+    authentication_classes = [authentication.SessionAuthentication, authentication.TokenAuthentication]
+    permission_classes = [IsMember]
+
+
+Topic_List_View = TopicListView.as_view()
