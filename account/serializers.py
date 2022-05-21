@@ -2,6 +2,8 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import UserProfile, TopicTag, SkillTag
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
 
 
 class TopicTagSerializer(serializers.ModelSerializer):
@@ -88,3 +90,27 @@ class UserSerializerWithToken(UserSerializer):
     def get_refresh(self, obj):
         token = RefreshToken.for_user(obj)
         return str(token)
+
+
+class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
+
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+
+        token['username'] = user.username
+        token['name'] = user.userprofile.name
+        token['profile_pic'] = 'static' + user.userprofile.profile_pic.url
+        token['is_staff'] = user.is_staff
+        token['id'] = user.id
+
+        return token
+
+    def validate(self, attrs):
+        data = super().validate(attrs)
+
+        serializer = UserSerializerWithToken(self.user).data
+        for k, v in serializer.items():
+            data[k] = v
+
+        return data

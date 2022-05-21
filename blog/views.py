@@ -1,117 +1,168 @@
-from rest_framework import generics, permissions, authentication
-from .permissions import IsMember, IsOwner
-from .serializers import ArticleSerializerDetial, TopicSerializer
-from .models import Article, Topic
+from rest_framework.response import Response
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework import status
+from django.db.models import Q
+from .models import Article, ArticleComment, ArticleVote
+from .serializers import ArticleSerializer, ArticleCommentSerializer
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import IsAuthenticated
+from account.models import TopicTag
 
 
-class ArticleDetailView(generics.RetrieveAPIView):
-    queryset = Article.objects.all()
-    serializer_class = ArticleSerializerDetial
-    lookup_field = 'pk'
-    authentication_classes = [authentication.SessionAuthentication, authentication.TokenAuthentication]
-    permission_classes = [IsMember]
-
-Article_Detail_View = ArticleDetailView.as_view()
-
-
-#____________________________ListAPIView____________________________________________#
-class ArticleListView(generics.ListAPIView):
-    queryset = Article.objects.all()
-    serializer_class = ArticleSerializerDetial
-    lookup_field = 'pk'
-    authentication_classes = [authentication.SessionAuthentication, authentication.TokenAuthentication]
-    permission_classes = [IsMember]
+@api_view(['GET'])
+@permission_classes((IsAuthenticated,))
+def articleListView(request):
+    query = request.query_params.get('q')
+    if query is None:
+        query = ''
+    articles = Article.objects.filter(Q(content__icontains=query) | Q(title__icontains=query)).order_by("-created")
+    paginator = PageNumberPagination()
+    paginator.page_size = 10
+    result_page = paginator.paginate_queryset(articles, request)
+    serializer = ArticleSerializer(result_page, many=True)
+    return paginator.get_paginated_response(serializer.data)
 
 
-Article_List_View = ArticleListView.as_view()
-#____________________________user ListAPIView____________________________________________#
-class UserArticleListView(generics.ListAPIView):
-    queryset = Article.objects.all()
-    serializer_class = ArticleSerializerDetial
-    lookup_field = 'pk'
-    authentication_classes = [authentication.SessionAuthentication, authentication.TokenAuthentication]
-    permission_classes = [IsMember]
-
-    def get_queryset(self, *args, **kwargs):
-        qs = super().get_queryset()
-        request = self.request
-        user = request.user
-        return qs.filter(owner=request.user)
-
-User_Article_List_View = UserArticleListView.as_view()
+@api_view(['GET'])
+def articleDetailView(request, pk):
+    try:
+        article = Article.objects.get(id=pk)
+        serializer = ArticleSerializer(article, many=False)
+        return Response(serializer.data)
+    except Exception as e:
+        return Response({'details': f"{e}"}, status=status.HTTP_204_NO_CONTENT)
 
 
-#____________________________CreateApiView____________________________________________#
-
-class ArticleCreateView(generics.CreateAPIView):
-    queryset = Article.objects.all()
-    serializer_class = ArticleSerializerDetial
-    authentication_classes = [authentication.SessionAuthentication, authentication.TokenAuthentication]
-    permission_classes = [IsMember]
-
-
-    def perform_create(self, serializer):
-        user = self.request.user
-        data = self.request.data
-        print(data)
-        topic_name = data['topic']['name']
-        qs = Topic.objects.filter(name__exact=topic_name).first()
-        if qs is None:
-            qs = Topic.objects.create(name=topic_name)
-        serializer.save(owner=user, topic=qs)
-
-
-Article_Create_View = ArticleCreateView.as_view()
-
-
-#____________________________ListCreateView____________________________________________#
-
-class ArticleListCreateView(generics.ListCreateAPIView):
-    queryset = Article.objects.all()
-    serializer_class = ArticleSerializerDetial
-    authentication_classes = [authentication.SessionAuthentication, authentication.TokenAuthentication]
-    permission_classes = [IsMember]
-
-Article_List_Create_View = ArticleListCreateView.as_view()
-
-#____________________________ListCreateView____________________________________________#
-
-class ArticleUpdateView(generics.UpdateAPIView):
-    queryset = Article.objects.all()
-    serializer_class = ArticleSerializerDetial
-
-    permission_classes = [permissions.IsAdminUser, IsOwner]
-    authentication_classes = [authentication.SessionAuthentication, authentication.TokenAuthentication]
-
-    def perform_update(self, serializer):
-        instance = serializer.save()
+@api_view(['POST'])
+# @permission_classes((IsAuthenticated,))
+def create_article(request):
+    user = request.user
+    print(user)
+    data = request.data
+    print(data)
+    is_comment = data.get('isComment')
+    if is_comment:
+        article = Article.objects.get(id=data.get('postId'))
+        comment = ArticleComment.objects.create(
+            user=user,
+            article=article,
+            content=data.get('content'),
+        )
+        comment.save()
+        serializer = ArticleCommentSerializer(comment, many=False)
+        return Response(serializer.data)
+    else:
+        print(user)
+        content = data.get('content')
+        tags = data.get('tags')
+        title = data.get('title')
+        article = Article.objects.create(
+            user=user,
+            content=content,
+            title=title,
+        )
+        if tags is not None:
+            for tag_name in tags:
+                tag_instance = TopicTag.objects.filter(name=tag_name).first()
+                if not tag_instance:
+                    tag_instance = TopicTag.objects.create(name=tag_name)
+                article.tags.add(tag_instance)
+        article.save()
+    serializer = ArticleSerializer(article, many=False)
+    return Response(serializer.data)
 
 
-Article_Update_View = ArticleUpdateView.as_view()
+@api_view(['PUT'])
+@permission_classes((IsAuthenticated,))
+def articleUpdateView(request, pk):
+    try:
+        article = Article.objects.get(id=pk)
+        if article.user == request.user:
+            data = request.data
+            article.title = data.get('title')
+            article.content = data.get('content')
+            article.tags = data.get('tags')
+            article.save()
+            serializer = ArticleSerializer(article, many=False)
+            return Response(serializer.data)
+        else:
+            return Response(status=status.HTTP_401_UNAUTHORIZED)
+    except Exception as e:
+        return Response({'details': f"{e}"}, status=status.HTTP_204_NO_CONTENT)
 
 
-#____________________________ListCreateView____________________________________________#
-
-class ArticleDestroyView(generics.DestroyAPIView):
-    queryset = Article.objects.all()
-    serializer_class = ArticleSerializerDetial
-
-    authentication_classes = [authentication.SessionAuthentication, authentication.TokenAuthentication]
-    permission_classes = [permissions.IsAdminUser, IsOwner]
-
-    def perform_destroy(self, instance):
-        return super().perform_destroy(instance)
-
-Article_Destroy_view = ArticleDestroyView.as_view()
-
-#____________________________user ListAPIView____________________________________________#
-
-class TopicListView(generics.ListAPIView):
-    queryset = Topic.objects.all()
-    serializer_class = TopicSerializer
-    lookup_field = 'pk'
-    authentication_classes = [authentication.SessionAuthentication, authentication.TokenAuthentication]
-    permission_classes = [IsMember]
+@api_view(['DELETE'])
+@permission_classes((IsAuthenticated,))
+def articleDeleteView(request, pk):
+    try:
+        article = Article.objects.get(id=pk)
+        if article.user == request.user:
+            article.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        else:
+            return Response(status=status.HTTP_401_UNAUTHORIZED)
+    except Exception as e:
+        return Response({'details': f"{e}"}, status=status.HTTP_204_NO_CONTENT)
 
 
-Topic_List_View = TopicListView.as_view()
+# ______________________________________________________Comment Upadte _________________________________________________#
+
+@api_view(['PUT'])
+@permission_classes((IsAuthenticated,))
+def articleCommentUpdateView(request, pk):
+    try:
+        comment = ArticleComment.objects.get(id=pk)
+        if comment.user == request.user:
+            serializer = ArticleCommentSerializer(comment, many=False)
+            return Response(serializer.data)
+        else:
+            return Response(status=status.HTTP_401_UNAUTHORIZED)
+    except Exception as e:
+        return Response({'details': f"{e}"}, status=status.HTTP_204_NO_CONTENT)
+
+
+# ______________________________________________________Comment delete _________________________________________________#
+
+@api_view(['DELETE'])
+@permission_classes((IsAuthenticated,))
+def articleCommentDeleteView(request, pk):
+    try:
+        comment = ArticleComment.objects.get(id=pk)
+        if comment.user == request.user:
+            serializer = ArticleCommentSerializer(comment, many=False)
+            comment.delete()
+            return Response(serializer.data)
+        else:
+            return Response(status=status.HTTP_401_UNAUTHORIZED)
+    except Exception as e:
+        return Response({'details': f"{e}"}, status=status.HTTP_204_NO_CONTENT)
+
+#____________________________________________________________Vote_______________________________________________________#
+
+
+@api_view(['POST'])
+@permission_classes((IsAuthenticated,))
+def voteUpdateView(request):
+    user = request.user
+    data = request.data
+    article_id = data.get('postId')
+    comment_id = data.get('commentId')
+
+    article = Article.objects.get(id=article_id)
+
+    if comment_id:
+        comment = ArticleComment.objects.get(id=comment_id)
+        vote, created = ArticleVote.objects.get_or_create(article=article,comment=comment,user=user,value=1)
+        if not created:
+            vote.delete()
+        else:
+            vote.save()
+    else:
+        vote, created = ArticleVote.objects.get_or_create(article=article,user=user,value=1)
+        if not created:
+            vote.delete()
+        else:
+            vote.save()
+
+    serializer = ArticleSerializer(article, many=False)
+    return Response(serializer.data)
