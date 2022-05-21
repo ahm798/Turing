@@ -17,5 +17,3 @@ class ArticleIndex(AlgoliaIndex):
         'searchableAttributes': ['title', 'content'],
         'attributesForFaceting': ['status'],
     }
-
-
